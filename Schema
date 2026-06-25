@@ -1,0 +1,59 @@
+-- 1. جدول المنتجات والمخزون
+CREATE TABLE products (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    barcode VARCHAR(100) UNIQUE,
+    purchase_price DECIMAL(12, 2) NOT NULL,
+    sale_price DECIMAL(12, 2) NOT NULL,
+    stock_quantity INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 2. جدول الموردين
+CREATE TABLE suppliers (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    phone VARCHAR(20)
+);
+
+-- 3. جدول فواتير المشتريات (رأس الفاتورة)
+CREATE TABLE purchase_invoices (
+    id SERIAL PRIMARY KEY,
+    supplier_id INT REFERENCES suppliers(id),
+    total_amount DECIMAL(12, 2),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 4. تفاصيل المشتريات (مربوطة بالمنتجات)
+CREATE TABLE purchase_items (
+    id SERIAL PRIMARY KEY,
+    invoice_id INT REFERENCES purchase_invoices(id),
+    product_id INT REFERENCES products(id),
+    quantity INT,
+    price DECIMAL(12, 2)
+);
+
+-- 5. جدول فواتير المبيعات (الأساس المحاسبي)
+CREATE TABLE sales_invoices (
+    id SERIAL PRIMARY KEY,
+    total_price DECIMAL(12, 2),
+    payment_method VARCHAR(50), -- كاش، آجل، إلخ
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 6. تفاصيل المبيعات
+CREATE TABLE sale_items (
+    id SERIAL PRIMARY KEY,
+    invoice_id INT REFERENCES sales_invoices(id),
+    product_id INT REFERENCES products(id),
+    quantity INT,
+    price DECIMAL(12, 2) -- السعر وقت البيع
+);
+
+-- 7. جدول المصروفات (للتقارير الحسابية)
+CREATE TABLE expenses (
+    id SERIAL PRIMARY KEY,
+    description TEXT,
+    amount DECIMAL(12, 2),
+    expense_date DATE DEFAULT CURRENT_DATE
+);
