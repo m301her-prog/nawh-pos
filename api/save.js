@@ -1,67 +1,33 @@
-// src/services/neonService.js
-import { CapacitorHttp } from '@capacitor/core';
+import { neon } from '@neondatabase/serverless';
 
-const BASE_API = "https://nawh-pos-yyre.vercel.app/api";
+// هذا هو "التصدير الافتراضي" الذي يبحث عنه Vercel
+export default async function handler(req, res) {
+    // 1. إعدادات CORS
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-export const neonService = {
-  
-  // --- دوال الجلب ---
-  // قمت بإضافة الـ action في الـ params ليعرف السيرفر أي جدول يطلب
-  async getProducts() {
-    const response = await CapacitorHttp.get({ url: `${BASE_API}/get?action=products` });
-    return response.data;
-  },
+    if (req.method === 'OPTIONS') return res.status(200).end();
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
 
-  async getPurchases() {
-    const response = await CapacitorHttp.get({ url: `${BASE_API}/get?action=purchases` });
-    return response.data;
-  },
+    try {
+        const sql = neon(process.env.DATABASE_URL);
+        const { action, ...data } = req.body;
 
-  async getSales() {
-    const response = await CapacitorHttp.get({ url: `${BASE_API}/get?action=sales` });
-    return response.data;
-  },
+        // التوجيه بناءً على الـ action الذي أرسلناه من neonService
+        if (action === 'add_product') {
+            const { name, barcode, purchase_price, sale_price, stock_quantity } = data;
+            await sql`INSERT INTO products (name, barcode, purchase_price, sale_price, stock_quantity) 
+                      VALUES (${name}, ${barcode || null}, ${parseFloat(purchase_price)}, ${parseFloat(sale_price)}, ${parseInt(stock_quantity || 0)})`;
+            return res.status(200).json({ success: true, message: "تم إضافة المنتج" });
+        }
+        
+        // أضف هنا باقي الـ actions (add_sale, add_expense, إلخ) بنفس الطريقة
+        
+        return res.status(400).json({ success: false, error: 'Action غير معروف' });
 
-  async getExpenses() {
-    const response = await CapacitorHttp.get({ url: `${BASE_API}/get?action=expenses` });
-    return response.data;
-  },
-
-  // --- دوال الحفظ ---
-  // تمت إضافة action لكل دالة ليعرف السيرفر أي جدول يستهدف
-  async addProduct(data) {
-    const response = await CapacitorHttp.post({
-      url: `${BASE_API}/save`,
-      headers: { 'Content-Type': 'application/json' },
-      data: { ...data, action: 'add_product' }
-    });
-    return response.data;
-  },
-
-  async addSale(data) {
-    const response = await CapacitorHttp.post({
-      url: `${BASE_API}/save`,
-      headers: { 'Content-Type': 'application/json' },
-      data: { ...data, action: 'add_sale' }
-    });
-    return response.data;
-  },
-
-  async addExpense(data) {
-    const response = await CapacitorHttp.post({
-      url: `${BASE_API}/save`,
-      headers: { 'Content-Type': 'application/json' },
-      data: { ...data, action: 'add_expense' }
-    });
-    return response.data;
-  },
-
-  async addSupplier(data) {
-    const response = await CapacitorHttp.post({
-      url: `${BASE_API}/save`,
-      headers: { 'Content-Type': 'application/json' },
-      data: { ...data, action: 'add_supplier' }
-    });
-    return response.data;
-  }
-};
+    } catch (error) {
+        console.error('DATABASE ERROR:', error);
+        return res.status(500).json({ success: false, error: error.message });
+    }
+}
