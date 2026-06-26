@@ -1,53 +1,67 @@
-import { neon } from '@neondatabase/serverless';
+// src/services/neonService.js
+import { CapacitorHttp } from '@capacitor/core';
 
-export default async function handler(request, response) {
-    // إعدادات CORS للسماح بالاتصال
-    response.setHeader('Access-Control-Allow-Origin', '*');
-    response.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    response.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+const BASE_API = "https://nawh-pos-yyre.vercel.app/api";
 
-    if (request.method === 'OPTIONS') return response.status(200).end();
-    if (request.method !== 'POST') return response.status(405).json({ error: 'Method Not Allowed' });
+export const neonService = {
+  
+  // --- دوال الجلب ---
+  // قمت بإضافة الـ action في الـ params ليعرف السيرفر أي جدول يطلب
+  async getProducts() {
+    const response = await CapacitorHttp.get({ url: `${BASE_API}/get?action=products` });
+    return response.data;
+  },
 
-    try {
-        const sql = neon(process.env.DATABASE_URL);
-        
-        // البيانات القادمة من النموذج في React
-        const { name, barcode, purchase_price, sale_price, stock_quantity } = request.body;
+  async getPurchases() {
+    const response = await CapacitorHttp.get({ url: `${BASE_API}/get?action=purchases` });
+    return response.data;
+  },
 
-        // التحقق من الحقول الأساسية
-        if (!name || !purchase_price || !sale_price) {
-            return response.status(400).json({ success: false, error: 'يرجى إدخال البيانات الأساسية (الاسم، سعر الشراء، سعر البيع)' });
-        }
+  async getSales() {
+    const response = await CapacitorHttp.get({ url: `${BASE_API}/get?action=sales` });
+    return response.data;
+  },
 
-        // تنفيذ الإدخال في قاعدة بيانات Neon
-        const result = await sql`
-            INSERT INTO products (
-                name, 
-                barcode, 
-                purchase_price, 
-                sale_price, 
-                stock_quantity
-            ) VALUES (
-                ${String(name)}, 
-                ${barcode ? String(barcode) : null}, 
-                ${parseFloat(purchase_price)}, 
-                ${parseFloat(sale_price)}, 
-                ${parseInt(stock_quantity || 0)}
-            ) RETURNING id;
-        `;
+  async getExpenses() {
+    const response = await CapacitorHttp.get({ url: `${BASE_API}/get?action=expenses` });
+    return response.data;
+  },
 
-        return response.status(200).json({ 
-            success: true, 
-            message: "تم إضافة المنتج بنجاح", 
-            product_id: result[0].id 
-        });
+  // --- دوال الحفظ ---
+  // تمت إضافة action لكل دالة ليعرف السيرفر أي جدول يستهدف
+  async addProduct(data) {
+    const response = await CapacitorHttp.post({
+      url: `${BASE_API}/save`,
+      headers: { 'Content-Type': 'application/json' },
+      data: { ...data, action: 'add_product' }
+    });
+    return response.data;
+  },
 
-    } catch (error) {
-        console.error('DATABASE ERROR:', error);
-        return response.status(500).json({ 
-            success: false, 
-            error: 'خطأ في قاعدة البيانات: ' + error.message 
-        });
-    }
-}
+  async addSale(data) {
+    const response = await CapacitorHttp.post({
+      url: `${BASE_API}/save`,
+      headers: { 'Content-Type': 'application/json' },
+      data: { ...data, action: 'add_sale' }
+    });
+    return response.data;
+  },
+
+  async addExpense(data) {
+    const response = await CapacitorHttp.post({
+      url: `${BASE_API}/save`,
+      headers: { 'Content-Type': 'application/json' },
+      data: { ...data, action: 'add_expense' }
+    });
+    return response.data;
+  },
+
+  async addSupplier(data) {
+    const response = await CapacitorHttp.post({
+      url: `${BASE_API}/save`,
+      headers: { 'Content-Type': 'application/json' },
+      data: { ...data, action: 'add_supplier' }
+    });
+    return response.data;
+  }
+};
