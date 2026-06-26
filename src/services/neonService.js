@@ -1,32 +1,53 @@
 // src/services/neonService.js
-// تأكد من تثبيت مكتبة pg: npm install pg
-import { Pool } from 'pg';
+import { CapacitorHttp } from '@capacitor/core';
 
-const pool = new Pool({
-  connectionString: import.meta.env.VITE_DATABASE_URL, // يوضع رابط قاعدة البيانات في ملف .env
-});
+const BASE_URL = "https://nawh-pos-yyre.vercel.app/api";
 
 export const neonService = {
-  // جلب إجمالي الأرباح للتقارير
+  
+  // 1. جلب التقارير المالية
   async getFinancialReport() {
     try {
-      const result = await pool.query(`
-        SELECT 
-          (SELECT SUM(total_price) FROM sales_invoices) as total_sales,
-          (SELECT SUM(amount) FROM expenses) as total_expenses
-      `);
-      return result.rows[0];
+      const response = await CapacitorHttp.get({
+        url: `${BASE_URL}/get` // الرابط الخاص بالجلب
+      });
+      return response.data;
     } catch (error) {
       console.error("خطأ في جلب التقارير:", error);
       throw error;
     }
   },
 
-  // إضافة عملية بيع جديدة
+  // 2. إضافة عملية بيع (مربوطة بجدول sales_invoices و sale_items)
+  // هذا يتوافق مع منطق الإدخال في الـ Schema الخاصة بك
   async addSale(saleData) {
-    const { total_price, payment_method } = saleData;
-    const query = 'INSERT INTO sales_invoices (total_price, payment_method) VALUES ($1, $2) RETURNING *';
-    const result = await pool.query(query, [total_price, payment_method]);
-    return result.rows[0];
+    try {
+      const response = await CapacitorHttp.post({
+        url: `${BASE_URL}/save`, // الرابط الخاص بالحفظ
+        headers: { 'Content-Type': 'application/json' },
+        data: {
+          total_price: saleData.total_price,
+          payment_method: saleData.payment_method,
+          items: saleData.items // مصفوفة الأصناف [{product_id, quantity, price}, ...]
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error("خطأ في إضافة البيع:", error);
+      throw error;
+    }
+  },
+
+  // 3. جلب المنتجات (للمخزون)
+  async getProducts() {
+    try {
+      const response = await CapacitorHttp.get({
+        url: `${BASE_URL}/get-products` // يفترض وجود هذا المسار في الـ API الخاص بك
+      });
+      return response.data;
+    } catch (error) {
+      console.error("خطأ في جلب المنتجات:", error);
+      throw error;
+    }
   }
 };
