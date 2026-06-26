@@ -5,60 +5,50 @@ const GET_URL = "https://nawh-pos-yyre.vercel.app/api/get";
 
 export const neonService = {
   
-  // --- دوال الجلب الموحدة ---
+  // --- دوال الجلب (تمت إضافة الـ action في الـ params) ---
   async getProducts() {
-    const response = await CapacitorHttp.get({ url: GET_URL });
+    const response = await CapacitorHttp.get({ url: `${GET_URL}?action=products` });
     return response.data;
   },
 
   async getPurchases() {
-    const response = await CapacitorHttp.get({ url: GET_URL });
+    const response = await CapacitorHttp.get({ url: `${GET_URL}?action=purchases` });
     return response.data;
   },
 
   async getSales() {
-    const response = await CapacitorHttp.get({ url: GET_URL });
+    const response = await CapacitorHttp.get({ url: `${GET_URL}?action=sales` });
     return response.data;
   },
 
   async getExpenses() {
-    const response = await CapacitorHttp.get({ url: GET_URL });
+    const response = await CapacitorHttp.get({ url: `${GET_URL}?action=expenses` });
     return response.data;
   },
 
-  // --- كل عمليات الحفظ موجهة لنفس الرابط ---
+  // --- دوال الحفظ (تم توحيد الهيكل: { action, data }) ---
   async addProduct(data) {
-    const response = await CapacitorHttp.post({
-      url: SAVE_URL,
-      headers: { 'Content-Type': 'application/json' },
-      data: data
-    });
-    return response.data;
+    return this.postData('add_product', data);
   },
 
   async addSale(data) {
-    const response = await CapacitorHttp.post({
-      url: SAVE_URL,
-      headers: { 'Content-Type': 'application/json' },
-      data: data
-    });
-    return response.data;
+    return this.postData('add_sale', data);
   },
 
   async addExpense(data) {
-    const response = await CapacitorHttp.post({
-      url: SAVE_URL,
-      headers: { 'Content-Type': 'application/json' },
-      data: data
-    });
-    return response.data;
+    return this.postData('add_expense', data);
   },
 
   async addSupplier(data) {
+    return this.postData('add_supplier', data);
+  },
+
+  // دالة مساعدة لتوحيد عملية الإرسال
+  async postData(action, data) {
     const response = await CapacitorHttp.post({
       url: SAVE_URL,
       headers: { 'Content-Type': 'application/json' },
-      data: data
+      data: { action, data } // الهيكل المتوافق مع الباك إند
     });
     return response.data;
   }
