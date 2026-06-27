@@ -12,12 +12,12 @@ export default function Purchases() {
   const [supModal, setSupModal] = useState(false);
   const [supForm, setSupForm] = useState({ name: '', phone: '' });
 
-  // جلب البيانات من الـ API
+  // جلب البيانات من الخدمة الجديدة
   useEffect(() => {
     async function loadData() {
       try {
         setLoading(true);
-        const data = await neonService.getPurchases(); // دالة جديدة سنضيفها
+        const data = await neonService.getPurchases();
         setInvoices(data || []);
       } catch (err) {
         console.error("خطأ في جلب المشتريات:", err);
@@ -28,11 +28,17 @@ export default function Purchases() {
     loadData();
   }, []);
 
-  // إضافة مورد جديد
+  // إضافة مورد جديد باستخدام الخدمة
   const handleAddSupplier = async () => {
-    await neonService.addSupplier(supForm);
-    setSupModal(false);
-    alert("تم إضافة المورد");
+    try {
+      await neonService.addSupplier(supForm);
+      setSupModal(false);
+      setSupForm({ name: '', phone: '' });
+      alert("تم إضافة المورد بنجاح");
+    } catch (err) {
+      console.error("خطأ في إضافة المورد:", err);
+      alert("حدث خطأ أثناء إضافة المورد");
+    }
   };
 
   const filtered = invoices.filter((i) =>
@@ -55,8 +61,12 @@ export default function Purchases() {
 
       <div className="relative mb-4">
         <Search size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ابحث عن فاتورة أو مورد..."
-          className="w-full pr-9 pl-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none bg-white" />
+        <input 
+          value={search} 
+          onChange={(e) => setSearch(e.target.value)} 
+          placeholder="ابحث عن فاتورة أو مورد..."
+          className="w-full pr-9 pl-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none bg-white" 
+        />
       </div>
 
       <Card>
@@ -81,7 +91,16 @@ export default function Purchases() {
 
       <Modal isOpen={supModal} onClose={() => setSupModal(false)} title="إضافة مورد جديد">
         <div className="space-y-3">
-          <Input label="الاسم" value={supForm.name} onChange={(e) => setSupForm({ ...supForm, name: e.target.value })} />
+          <Input 
+            label="الاسم" 
+            value={supForm.name} 
+            onChange={(e) => setSupForm({ ...supForm, name: e.target.value })} 
+          />
+          <Input 
+            label="الهاتف" 
+            value={supForm.phone} 
+            onChange={(e) => setSupForm({ ...supForm, phone: e.target.value })} 
+          />
           <Button variant="primary" className="w-full" onClick={handleAddSupplier}>حفظ</Button>
         </div>
       </Modal>
