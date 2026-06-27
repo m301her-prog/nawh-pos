@@ -1,50 +1,53 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Eye, Truck, Loader2 } from 'lucide-react';
-import { formatCurrency, formatDate, today } from '../lib/helpers.js';
-import { Button, Input, Badge, Modal, Card, PageHeader, EmptyState } from '../components/ui.jsx';
+import { Plus, Search, Truck, Loader2 } from 'lucide-react';
+import { formatCurrency, formatDate } from '../lib/helpers.js';
+// تأكد من أن أسماء المكونات المستوردة مطابقة تماماً لما هو موجود في ملفك
+import { Button, Input, Modal, Card, PageHeader, EmptyState } from '../components/ui.jsx';
 import { neonService } from '../services/neonService.js';
 
 export default function Purchases() {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [invModal, setInvModal] = useState(false);
   const [supModal, setSupModal] = useState(false);
   const [supForm, setSupForm] = useState({ name: '', phone: '' });
 
-  // جلب البيانات من الخدمة الجديدة
   useEffect(() => {
+    let isMounted = true; // لمنع تحديث الحالة إذا تم إلغاء المكون
     async function loadData() {
       try {
         setLoading(true);
         const data = await neonService.getPurchases();
-        setInvoices(data || []);
+        if (isMounted) {
+          setInvoices(Array.isArray(data) ? data : []);
+        }
       } catch (err) {
         console.error("خطأ في جلب المشتريات:", err);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     }
     loadData();
+    return () => { isMounted = false; };
   }, []);
 
-  // إضافة مورد جديد باستخدام الخدمة
   const handleAddSupplier = async () => {
     try {
       await neonService.addSupplier(supForm);
       setSupModal(false);
       setSupForm({ name: '', phone: '' });
-      alert("تم إضافة المورد بنجاح");
+      // بدلاً من التحديث الكامل، يفضل تحديث القائمة يدوياً إذا كانت تؤثر على العرض
     } catch (err) {
       console.error("خطأ في إضافة المورد:", err);
       alert("حدث خطأ أثناء إضافة المورد");
     }
   };
 
-  const filtered = invoices.filter((i) =>
-    i.invoice_number?.toLowerCase().includes(search.toLowerCase()) ||
-    (i.supplier_name ?? '').toLowerCase().includes(search.toLowerCase())
-  );
+  // حماية من القيم غير المعرفة
+  const filtered = Array.isArray(invoices) ? invoices.filter((i) =>
+    (i?.invoice_number?.toLowerCase() || '').includes(search.toLowerCase()) ||
+    (i?.supplier_name?.toLowerCase() || '').includes(search.toLowerCase())
+  ) : [];
 
   return (
     <div className="p-4 max-w-5xl mx-auto">
@@ -52,10 +55,10 @@ export default function Purchases() {
         title="المشتريات"
         subtitle="تسجيل فواتير الموردين"
         actions={
-          <>
-            <Button variant="secondary" onClick={() => setSupModal(true)}><Truck size={15} />مورد</Button>
-            <Button variant="primary" onClick={() => setInvModal(true)}><Plus size={15} />جديد</Button>
-          </>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => setSupModal(true)}><Truck size={15} /> مورد</Button>
+            <Button variant="primary" onClick={() => {}}><Plus size={15} /> جديد</Button>
+          </div>
         }
       />
 
@@ -77,12 +80,12 @@ export default function Purchases() {
         ) : (
           <div className="divide-y divide-gray-100">
             {filtered.map((inv) => (
-              <div key={inv.id} className="flex items-center justify-between p-4">
+              <div key={inv?.id || Math.random()} className="flex items-center justify-between p-4">
                 <div>
-                  <p className="font-bold text-sm">مورد: {inv.supplier_name}</p>
-                  <p className="text-xs text-gray-400">{formatDate(inv.created_at)}</p>
+                  <p className="font-bold text-sm">مورد: {inv?.supplier_name || 'غير معروف'}</p>
+                  <p className="text-xs text-gray-400">{inv?.created_at ? formatDate(inv.created_at) : ''}</p>
                 </div>
-                <p className="font-bold text-teal-700">{formatCurrency(inv.total_amount)}</p>
+                <p className="font-bold text-teal-700">{formatCurrency(inv?.total_amount || 0)}</p>
               </div>
             ))}
           </div>
@@ -91,16 +94,8 @@ export default function Purchases() {
 
       <Modal isOpen={supModal} onClose={() => setSupModal(false)} title="إضافة مورد جديد">
         <div className="space-y-3">
-          <Input 
-            label="الاسم" 
-            value={supForm.name} 
-            onChange={(e) => setSupForm({ ...supForm, name: e.target.value })} 
-          />
-          <Input 
-            label="الهاتف" 
-            value={supForm.phone} 
-            onChange={(e) => setSupForm({ ...supForm, phone: e.target.value })} 
-          />
+          <Input label="الاسم" value={supForm.name} onChange={(e) => setSupForm({ ...supForm, name: e.target.value })} />
+          <Input label="الهاتف" value={supForm.phone} onChange={(e) => setSupForm({ ...supForm, phone: e.target.value })} />
           <Button variant="primary" className="w-full" onClick={handleAddSupplier}>حفظ</Button>
         </div>
       </Modal>
