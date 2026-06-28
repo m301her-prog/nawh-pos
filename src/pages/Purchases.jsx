@@ -1,32 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Truck, Loader2 } from 'lucide-react';
 import { formatCurrency, formatDate } from '../lib/helpers.js';
-import { Button, Input, Modal, Card, PageHeader, EmptyState, Select } from '../components/ui.jsx';
+import { Button, Input, Modal, Card, PageHeader, EmptyState } from '../components/ui.jsx';
 import { neonService } from '../services/neonService.js';
 
 export default function Purchases() {
   const [invoices, setInvoices] = useState([]);
-  const [suppliers, setSuppliers] = useState([]); // قائمة الموردين
+  const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   
-  // Modal states
   const [supModal, setSupModal] = useState(false);
   const [invModal, setInvModal] = useState(false);
   
   const [supForm, setSupForm] = useState({ name: '', phone: '' });
   const [invForm, setInvForm] = useState({ supplier_id: '', total_amount: '' });
 
-  // دالة تحميل البيانات الموحدة
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [invData, supData] = await Promise.all([
-        neonService.getPurchases(),
-        neonService.getSuppliers() // تأكد من وجود هذه الدالة في خدمتك
-      ]);
-      setInvoices(Array.isArray(invData) ? invData : []);
-      setSuppliers(Array.isArray(supData) ? supData : []);
+      // جلب البيانات بشكل منفصل لمعالجة كل استجابة على حدة
+      const invRes = await neonService.getPurchases();
+      const supRes = await neonService.getSuppliers();
+      
+      // منطق استخراج البيانات بمرونة (سواء كانت مصفوفة مباشرة أو داخل كائن)
+      const invData = Array.isArray(invRes) ? invRes : (invRes?.data || invRes?.rows || []);
+      const supData = Array.isArray(supRes) ? supRes : (supRes?.data || supRes?.rows || []);
+      
+      setInvoices(invData);
+      setSuppliers(supData);
     } catch (err) {
       console.error("خطأ في جلب البيانات:", err);
     } finally {
@@ -37,17 +39,19 @@ export default function Purchases() {
   useEffect(() => { fetchData(); }, []);
 
   const handleAddSupplier = async () => {
+    if (!supForm.name) return alert("الرجاء كتابة اسم المورد");
     await neonService.addSupplier(supForm);
     setSupModal(false);
     setSupForm({ name: '', phone: '' });
-    fetchData(); // تحديث القائمة بعد الإضافة
+    fetchData();
   };
 
   const handleAddInvoice = async () => {
-    await neonService.addPurchase(invForm); // تأكد من وجود دالة إضافة فاتورة
+    if (!invForm.supplier_id || !invForm.total_amount) return alert("الرجاء تعبئة بيانات الفاتورة");
+    await neonService.addPurchase(invForm);
     setInvModal(false);
     setInvForm({ supplier_id: '', total_amount: '' });
-    fetchData(); // تحديث القائمة بعد الإضافة
+    fetchData();
   };
 
   const filtered = invoices.filter((i) =>
@@ -67,28 +71,43 @@ export default function Purchases() {
         }
       />
 
-      {/* ... (باقي كود البحث والـ Card كما هي) ... */}
+      <div className="relative mb-4">
+        <Search size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث..."
+          className="w-full pr-9 pl-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none bg-white" />
+      </div>
 
-      {/* مودال المورد */}
+      <Card>
+        {loading ? <div className="py-10 text-center"><Loader2 className="animate-spin mx-auto text-teal-600" /></div> :
+         filtered.length === 0 ? <EmptyState icon={<Truck size={28} />} title="لا توجد فواتير" /> :
+         <div className="divide-y divide-gray-100">
+            {filtered.map((inv) => (
+              <div key={inv.id} className="flex items-center justify-between p-4">
+                <div>
+                  <p className="font-bold text-sm">مورد: {inv.supplier_name}</p>
+                  <p className="text-xs text-gray-400">{formatDate(inv.created_at)}</p>
+                </div>
+                <p className="font-bold text-teal-700">{formatCurrency(inv.total_amount)}</p>
+              </div>
+            ))}
+         </div>
+        }
+      </Card>
+
       <Modal isOpen={supModal} onClose={() => setSupModal(false)} title="إضافة مورد">
         <Input label="الاسم" value={supForm.name} onChange={(e) => setSupForm({...supForm, name: e.target.value})} />
         <Input label="الهاتف" value={supForm.phone} onChange={(e) => setSupForm({...supForm, phone: e.target.value})} />
         <Button onClick={handleAddSupplier} className="w-full mt-3">حفظ المورد</Button>
       </Modal>
 
-      {/* مودال فاتورة الشراء */}
       <Modal isOpen={invModal} onClose={() => setInvModal(false)} title="تسجيل فاتورة">
         <div className="space-y-3">
-          <label className="text-sm font-medium">اختر المورد</label>
-          <select 
-            className="w-full p-2 border rounded"
-            value={invForm.supplier_id} 
-            onChange={(e) => setInvForm({...invForm, supplier_id: e.target.value})}
-          >
+          <label className="text-sm font-bold block">المورد</label>
+          <select className="w-full p-2 border rounded" value={invForm.supplier_id} onChange={(e) => setInvForm({...invForm, supplier_id: e.target.value})}>
             <option value="">اختر مورد...</option>
             {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
-          <Input label="المبلغ الإجمالي" type="number" value={invForm.total_amount} onChange={(e) => setInvForm({...invForm, total_amount: e.target.value})} />
+          <Input label="المبلغ" type="number" value={invForm.total_amount} onChange={(e) => setInvForm({...invForm, total_amount: e.target.value})} />
           <Button onClick={handleAddInvoice} className="w-full">حفظ الفاتورة</Button>
         </div>
       </Modal>
