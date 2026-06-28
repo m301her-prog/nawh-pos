@@ -1,67 +1,66 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Calendar, Loader2 } from 'lucide-react';
+import { Plus, Search, Calendar, Loader2, Tag, FileText } from 'lucide-react';
 import { formatCurrency, formatDate, today } from '../lib/helpers.js';
-import { Button, Input, Modal, Card, EmptyState, PageHeader } from '../components/ui.jsx';
+import { Button, Input, Modal, Card, EmptyState, PageHeader, Select } from '../components/ui.jsx';
 import { neonService } from '../services/neonService.js';
+
+// القيم الافتراضية
+const INITIAL_FORM = { 
+  category: 'عام', 
+  description: '', 
+  amount: '', 
+  expense_date: today(), 
+  notes: '' 
+};
 
 export default function Expenses() {
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
-  const [form, setForm] = useState({
-    category: 'عام', 
-    description: '', 
-    amount: '',
-    expense_date: today(), 
-    payment_method: 'نقداً', 
-    notes: '',
-  });
+  const [form, setForm] = useState(INITIAL_FORM);
 
-  // جلب البيانات عند التحميل
   useEffect(() => {
-    async function loadExpenses() {
+    async function loadData() {
       try {
         setLoading(true);
         const data = await neonService.getExpenses();
-        setExpenses(data || []);
+        setExpenses(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error("خطأ في جلب المصروفات:", err);
       } finally {
         setLoading(false);
       }
     }
-    loadExpenses();
+    loadData();
   }, []);
 
-  // إضافة مصروف وتحديث القائمة محلياً
   const handleSave = async () => {
+    if (!form.description || !form.amount) {
+      alert("يرجى تعبئة البيانات المطلوبة");
+      return;
+    }
     try {
       const newExpense = await neonService.addExpense(form);
       if (newExpense) {
-        setExpenses([...expenses, newExpense]);
+        // تحديث القائمة فوراً
+        setExpenses([newExpense, ...expenses]);
         setModalOpen(false);
-        setForm({ ...form, description: '', amount: '' }); // إعادة تعيين النموذج
+        setForm(INITIAL_FORM);
       }
     } catch (err) {
-      console.error("خطأ في حفظ المصروف:", err);
       alert("حدث خطأ أثناء حفظ المصروف");
     }
   };
 
-  const filtered = expenses.filter((e) => {
-    const desc = e.description?.toLowerCase() || '';
-    const cat = e.category?.toLowerCase() || '';
-    return desc.includes(search.toLowerCase()) || cat.includes(search.toLowerCase());
-  });
+  const filtered = expenses.filter((e) => 
+    (e.description?.toLowerCase() || '').includes(search.toLowerCase()) || 
+    (e.category?.toLowerCase() || '').includes(search.toLowerCase())
+  );
 
-  // الحسابات المالية
-  const todayStr = today();
-  const todayTotal = filtered
-    .filter((e) => e.expense_date === todayStr)
+  const todayTotal = expenses
+    .filter((e) => e.expense_date === today())
     .reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
-    
-  const filtTotal = filtered.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
 
   return (
     <div className="p-4 max-w-5xl mx-auto">
@@ -77,8 +76,8 @@ export default function Expenses() {
           <p className="font-bold text-base text-red-700">{formatCurrency(todayTotal)}</p>
         </div>
         <div className="rounded-xl p-4 text-center bg-blue-50">
-          <p className="text-gray-500 text-xs mb-1">المجموع الكلي</p>
-          <p className="font-bold text-base text-blue-700">{formatCurrency(filtTotal)}</p>
+          <p className="text-gray-500 text-xs mb-1">إجمالي المصروفات</p>
+          <p className="font-bold text-base text-blue-700">{formatCurrency(expenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0))}</p>
         </div>
       </div>
 
@@ -87,7 +86,7 @@ export default function Expenses() {
         <input 
           value={search} 
           onChange={(e) => setSearch(e.target.value)} 
-          placeholder="ابحث عن مصروف..."
+          placeholder="بحث في المصروفات..."
           className="w-full pr-9 pl-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-teal-500 bg-white" 
         />
       </div>
@@ -100,10 +99,10 @@ export default function Expenses() {
         ) : (
           <div className="divide-y divide-gray-100">
             {filtered.map((e) => (
-              <div key={e.id} className="flex justify-between p-4 text-sm">
+              <div key={e.id} className="flex justify-between items-center p-4 text-sm">
                 <div>
-                    <p className="font-medium">{e.description}</p>
-                    <p className="text-xs text-gray-400">{formatDate(e.expense_date)}</p>
+                  <p className="font-medium">{e.description}</p>
+                  <p className="text-xs text-gray-400">{formatDate(e.expense_date)} • {e.category}</p>
                 </div>
                 <span className="font-bold text-red-600">{formatCurrency(e.amount)}</span>
               </div>
@@ -112,20 +111,12 @@ export default function Expenses() {
         )}
       </Card>
 
-      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title="إضافة مصروف" size="sm">
-        <div className="space-y-3">
-          <Input 
-            label="البيان" 
-            value={form.description} 
-            onChange={(e) => setForm({ ...form, description: e.target.value })} 
-          />
-          <Input 
-            label="المبلغ" 
-            type="number" 
-            value={form.amount} 
-            onChange={(e) => setForm({ ...form, amount: e.target.value })} 
-          />
-          <Button variant="primary" className="w-full" onClick={handleSave}>حفظ</Button>
+      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title="إضافة مصروف جديد">
+        <div className="space-y-4">
+          <Input label="البيان" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+          <Input label="المبلغ" type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+          <Input label="التاريخ" type="date" value={form.expense_date} onChange={(e) => setForm({ ...form, expense_date: e.target.value })} />
+          <Button variant="primary" className="w-full" onClick={handleSave}>حفظ المصروف</Button>
         </div>
       </Modal>
     </div>
