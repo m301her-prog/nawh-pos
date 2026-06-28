@@ -19,16 +19,23 @@ export default function Purchases() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // جلب البيانات بشكل منفصل لمعالجة كل استجابة على حدة
-      const invRes = await neonService.getPurchases();
-      const supRes = await neonService.getSuppliers();
+      const [invRes, supRes] = await Promise.all([
+        neonService.getPurchases(),
+        neonService.getSuppliers()
+      ]);
       
-      // منطق استخراج البيانات بمرونة (سواء كانت مصفوفة مباشرة أو داخل كائن)
       const invData = Array.isArray(invRes) ? invRes : (invRes?.data || invRes?.rows || []);
       const supData = Array.isArray(supRes) ? supRes : (supRes?.data || supRes?.rows || []);
       
-      setInvoices(invData);
       setSuppliers(supData);
+
+      // دمج اسم المورد مع بيانات الفاتورة
+      const mergedInvoices = invData.map(inv => ({
+        ...inv,
+        supplier_name: supData.find(s => String(s.id) === String(inv.supplier_id))?.name || "مورد غير معروف"
+      }));
+      
+      setInvoices(mergedInvoices);
     } catch (err) {
       console.error("خطأ في جلب البيانات:", err);
     } finally {
@@ -73,7 +80,7 @@ export default function Purchases() {
 
       <div className="relative mb-4">
         <Search size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث..."
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="بحث باسم المورد..."
           className="w-full pr-9 pl-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none bg-white" />
       </div>
 
@@ -85,7 +92,7 @@ export default function Purchases() {
               <div key={inv.id} className="flex items-center justify-between p-4">
                 <div>
                   <p className="font-bold text-sm">مورد: {inv.supplier_name}</p>
-                  <p className="text-xs text-gray-400">{formatDate(inv.created_at)}</p>
+                  <p className="text-xs text-gray-400">{inv.created_at ? formatDate(inv.created_at) : 'تاريخ غير متوفر'}</p>
                 </div>
                 <p className="font-bold text-teal-700">{formatCurrency(inv.total_amount)}</p>
               </div>
